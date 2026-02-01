@@ -633,13 +633,15 @@
             <div class="content-section">
                 <div class="section-header">
                     <h3>📅 用藥排程</h3>
-                </div>
-                <div id="scheduleList">
-                    <div class="empty-state">
-                        <div class="icon">📅</div>
-                        <p>尚未設定用藥排程</p>
+                    <div>
+                        <select id="scheduleFilter" onchange="renderSchedule()" style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                            <option value="today">今日</option>
+                            <option value="week">本週</option>
+                            <option value="all">全部</option>
+                        </select>
                     </div>
                 </div>
+                <div id="scheduleList"></div>
             </div>
         </div>
 
@@ -648,13 +650,16 @@
             <div class="content-section">
                 <div class="section-header">
                     <h3>📋 歷史記錄</h3>
-                </div>
-                <div id="historyList">
-                    <div class="empty-state">
-                        <div class="icon">📋</div>
-                        <p>尚無服藥記錄</p>
+                    <div>
+                        <select id="historyFilter" onchange="loadHistory()" style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                            <option value="7">最近 7 天</option>
+                            <option value="30">最近 30 天</option>
+                            <option value="90">最近 3 個月</option>
+                            <option value="all">全部</option>
+                        </select>
                     </div>
                 </div>
+                <div id="historyList"></div>
             </div>
         </div>
 
@@ -1400,6 +1405,228 @@
             document.querySelector('#addMemberModal form').reset();
         }
 
+        // 渲染用藥排程
+        function renderSchedule() {
+            const container = document.getElementById('scheduleList');
+            const filter = document.getElementById('scheduleFilter').value;
+            
+            if (medicines.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📅</div>
+                        <p>尚未設定用藥排程</p>
+                        <p style="font-size: 12px; margin-top: 10px;">請先到「藥物管理」新增藥物</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // 按日期分組
+            const scheduleByDate = {};
+            const today = new Date();
+            
+            // 決定要顯示幾天
+            let daysToShow = 1;
+            if (filter === 'week') daysToShow = 7;
+            if (filter === 'all') daysToShow = 30;
+
+            // 生成未來幾天的排程
+            for (let i = 0; i < daysToShow; i++) {
+                const date = new Date(today);
+                date.setDate(date.getDate() + i);
+                const dateKey = date.toDateString();
+                const dateDisplay = date.toLocaleDateString('zh-TW', { 
+                    month: 'long', 
+                    day: 'numeric', 
+                    weekday: 'short' 
+                });
+
+                scheduleByDate[dateKey] = {
+                    display: dateDisplay,
+                    isToday: i === 0,
+                    items: []
+                };
+
+                medicines.forEach(med => {
+                    const times = Array.isArray(med.times) ? med.times : [med.time];
+                    times.forEach(time => {
+                        if (med.frequency === 'once' || med.frequency === 'twice' || 
+                            med.frequency === 'three' || med.frequency === 'daily') {
+                            scheduleByDate[dateKey].items.push({
+                                name: med.name,
+                                dosage: med.dosage,
+                                time: time,
+                                member: med.member || 'self'
+                            });
+                        }
+                    });
+                });
+
+                // 排序
+                scheduleByDate[dateKey].items.sort((a, b) => a.time.localeCompare(b.time));
+            }
+
+            // 渲染
+            let html = '';
+            Object.keys(scheduleByDate).forEach(dateKey => {
+                const day = scheduleByDate[dateKey];
+                if (day.items.length === 0) return;
+
+                const memberName = (memberId) => {
+                    if (memberId === 'self') return '';
+                    const member = familyMembers.find(m => m.id === memberId);
+                    return member ? ` (${member.name})` : '';
+                };
+
+                html += `
+                    <div style="margin-bottom: 30px;">
+                        <h4 style="color: ${day.isToday ? '#667eea' : '#666'}; margin-bottom: 15px; font-size: 16px;">
+                            ${day.isToday ? '📍 ' : ''}${day.display}
+                        </h4>
+                        <div class="med-list">
+                            ${day.items.map(item => `
+                                <div class="med-item">
+                                    <div class="med-icon">💊</div>
+                                    <div class="med-info">
+                                        <div class="med-name">${item.name}${memberName(item.member)}</div>
+                                        <div class="med-dosage">${item.dosage}</div>
+                                    </div>
+                                    <div class="med-time">
+                                        <div class="time">${item.time}</div>
+                                        <div class="time-label">${getTimeLabel(item.time)}</div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html || `
+                <div class="empty-state">
+                    <div class="icon">📅</div>
+                    <p>此期間無用藥排程</p>
+                </div>
+            `;
+        }
+
+        // 載入歷史記錄
+        async function loadHistory() {
+            const container = document.getElementById('historyList');
+            const filter = document.getElementById('historyFilter').value;
+            
+            try {
+                // 計算日期範圍
+                let startDate = new Date();
+                if (filter !== 'all') {
+                    startDate.setDate(startDate.getDate() - parseInt(filter));
+                } else {
+                    startDate = new Date(2020, 0, 1); // 從很久以前開始
+                }
+
+                const snapshot = await db.collection('records')
+                    .where('userId', '==', currentUser.uid)
+                    .get();
+
+                const records = [];
+                snapshot.forEach(doc => {
+                    const record = doc.data();
+                    const recordDate = new Date(record.date);
+                    if (recordDate >= startDate) {
+                        records.push({
+                            id: doc.id,
+                            ...record
+                        });
+                    }
+                });
+
+                // 在客戶端排序
+                records.sort((a, b) => {
+                    if (b.createdAt && a.createdAt) {
+                        return b.createdAt.toMillis() - a.createdAt.toMillis();
+                    }
+                    return new Date(b.date) - new Date(a.date);
+                });
+
+                if (records.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📋</div>
+                            <p>此期間無服藥記錄</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // 按日期分組
+                const recordsByDate = {};
+                records.forEach(record => {
+                    const dateKey = record.date;
+                    if (!recordsByDate[dateKey]) {
+                        const date = new Date(dateKey);
+                        recordsByDate[dateKey] = {
+                            display: date.toLocaleDateString('zh-TW', { 
+                                year: 'numeric',
+                                month: 'long', 
+                                day: 'numeric', 
+                                weekday: 'short' 
+                            }),
+                            records: []
+                        };
+                    }
+                    
+                    // 找到對應的藥物
+                    const medicine = medicines.find(m => m.id === record.medicineId);
+                    if (medicine) {
+                        recordsByDate[dateKey].records.push({
+                            ...record,
+                            medicineName: medicine.name,
+                            dosage: medicine.dosage
+                        });
+                    }
+                });
+
+                // 渲染
+                let html = '';
+                Object.keys(recordsByDate).sort().reverse().forEach(dateKey => {
+                    const day = recordsByDate[dateKey];
+                    
+                    html += `
+                        <div style="margin-bottom: 30px;">
+                            <h4 style="color: #666; margin-bottom: 15px; font-size: 16px;">
+                                ${day.display}
+                            </h4>
+                            <div class="med-list">
+                                ${day.records.map(record => `
+                                    <div class="med-item">
+                                        <div class="med-icon" style="background: #4caf50;">✓</div>
+                                        <div class="med-info">
+                                            <div class="med-name">${record.medicineName}</div>
+                                            <div class="med-dosage">${record.dosage} • 計劃時間: ${record.time}</div>
+                                        </div>
+                                        <div class="med-time">
+                                            <div class="time">${record.actualTime || record.time}</div>
+                                            <div class="time-label">實際服用</div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('載入歷史記錄錯誤:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">❌</div>
+                        <p>載入失敗：${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
         // 頁面切換
         function showPage(page) {
             const pages = ['home', 'medicines', 'schedule', 'history', 'settings'];
@@ -1411,6 +1638,13 @@
                 item.classList.remove('active');
             });
             event.target.closest('.nav-item').classList.add('active');
+
+            // 載入對應頁面的資料
+            if (page === 'schedule') {
+                renderSchedule();
+            } else if (page === 'history') {
+                loadHistory();
+            }
         }
 
         // 登出
