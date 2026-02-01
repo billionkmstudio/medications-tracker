@@ -1040,32 +1040,94 @@
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
-            await db.collection('medicines').add(medicine);
-            showToast('藥物新增成功', 'success');
-            closeAddMedicineModal();
-            await loadMedicines();
-            updateDashboard();
+            try {
+                await db.collection('medicines').add(medicine);
+                
+                // 顯示成功訊息
+                showToast('✅ 藥物新增成功！', 'success');
+                
+                // 彈出確認視窗
+                alert('✅ 藥物新增成功！\n\n' + 
+                      '藥物：' + medicine.name + '\n' +
+                      '劑量：' + medicine.dosage + '\n' +
+                      '時間：' + medicine.time);
+                
+                closeAddMedicineModal();
+                await loadMedicines();
+                updateDashboard();
+            } catch (error) {
+                console.error('新增藥物錯誤:', error);
+                
+                // 顯示錯誤訊息
+                showToast('❌ 新增失敗：' + error.message, 'error');
+                
+                // 彈出錯誤視窗
+                alert('❌ 新增藥物失敗\n\n' + 
+                      '錯誤：' + error.message + '\n\n' +
+                      '請檢查 Firebase Firestore 規則設定');
+            }
         }
 
         // 刪除藥物
         async function deleteMedicine(id) {
-            if (!confirm('確定要刪除此藥物嗎？')) return;
+            const medicine = medicines.find(m => m.id === id);
+            const confirmMsg = '確定要刪除此藥物嗎？\n\n' +
+                              '藥物：' + medicine.name + '\n' +
+                              '劑量：' + medicine.dosage;
+            
+            if (!confirm(confirmMsg)) return;
 
-            await db.collection('medicines').doc(id).delete();
-            showToast('藥物已刪除', 'success');
-            await loadMedicines();
-            updateDashboard();
+            try {
+                await db.collection('medicines').doc(id).delete();
+                showToast('✅ 藥物已刪除', 'success');
+                alert('✅ 藥物已成功刪除！');
+                await loadMedicines();
+                updateDashboard();
+            } catch (error) {
+                console.error('刪除藥物錯誤:', error);
+                showToast('❌ 刪除失敗：' + error.message, 'error');
+                alert('❌ 刪除藥物失敗\n\n錯誤：' + error.message);
+            }
         }
 
         // 儲存設定
         async function saveSettings() {
             const name = document.getElementById('settingsName').value;
             
-            await currentUser.updateProfile({ displayName: name });
-            await db.collection('users').doc(currentUser.uid).update({ name });
-            
-            showToast('設定已儲存', 'success');
-            initializePage();
+            try {
+                await currentUser.updateProfile({ displayName: name });
+                await db.collection('users').doc(currentUser.uid).update({ name });
+                
+                // 顯示成功訊息
+                showToast('✅ 設定已儲存', 'success');
+                
+                // 彈出確認視窗
+                alert('✅ 設定已成功儲存！\n\n姓名：' + name);
+                
+                initializePage();
+            } catch (error) {
+                console.error('儲存設定錯誤:', error);
+                
+                // 如果用戶資料不存在，嘗試建立
+                if (error.code === 'not-found') {
+                    try {
+                        await db.collection('users').doc(currentUser.uid).set({ 
+                            name: name,
+                            email: currentUser.email,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        showToast('✅ 設定已儲存', 'success');
+                        alert('✅ 設定已成功儲存！\n\n姓名：' + name);
+                        initializePage();
+                    } catch (createError) {
+                        showToast('❌ 儲存失敗：' + createError.message, 'error');
+                        alert('❌ 儲存設定失敗\n\n錯誤：' + createError.message);
+                    }
+                } else {
+                    showToast('❌ 儲存失敗：' + error.message, 'error');
+                    alert('❌ 儲存設定失敗\n\n錯誤：' + error.message);
+                }
+            }
         }
 
         // Modal 控制
