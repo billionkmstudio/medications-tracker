@@ -669,6 +669,10 @@
                     <input type="text" id="settingsName" placeholder="請輸入姓名">
                 </div>
                 <div class="form-group">
+                    <label>出生日期</label>
+                    <input type="date" id="settingsBirthday" placeholder="選擇出生日期">
+                </div>
+                <div class="form-group">
                     <label>電子郵件</label>
                     <input type="email" id="settingsEmail" disabled>
                 </div>
@@ -682,6 +686,20 @@
                 </div>
                 <button class="btn-primary" onclick="saveSettings()">儲存設定</button>
             </div>
+
+            <!-- 家庭成員管理 -->
+            <div class="content-section" style="margin-top: 20px;">
+                <div class="section-header">
+                    <h3>👨‍👩‍👧‍👦 家庭成員管理</h3>
+                    <button class="btn-primary" onclick="openAddMemberModal()">+ 新增成員</button>
+                </div>
+                <div id="membersList" class="med-list">
+                    <div class="empty-state">
+                        <div class="icon">👤</div>
+                        <p>尚未新增家庭成員</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -694,6 +712,12 @@
             </div>
             <form onsubmit="handleAddMedicine(event)">
                 <div class="form-group">
+                    <label>服用對象 *</label>
+                    <select id="medMember" required>
+                        <option value="self">本人</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>藥物名稱 *</label>
                     <input type="text" id="medName" required placeholder="例：降血壓藥 Amlodipine">
                 </div>
@@ -703,66 +727,71 @@
                 </div>
                 <div class="form-group">
                     <label>服用頻率 *</label>
-                    <select id="medFrequency" required>
-                        <option value="daily">每日</option>
+                    <select id="medFrequency" required onchange="updateTimeFields()">
+                        <option value="once">每日一次</option>
+                        <option value="twice">每日兩次（早晚）</option>
+                        <option value="three">每日三次（早中晚）</option>
+                        <option value="custom">自訂次數</option>
                         <option value="weekly">每週</option>
                         <option value="asNeeded">需要時</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>服用時間 *</label>
-                    <select id="medTime" required>
-                        <option value="">請選擇時間</option>
-                        <optgroup label="清晨">
-                            <option value="06:00">06:00 清晨</option>
-                            <option value="06:30">06:30 清晨</option>
-                            <option value="07:00">07:00 清晨</option>
-                            <option value="07:30">07:30 清晨</option>
-                        </optgroup>
-                        <optgroup label="早上">
-                            <option value="08:00">08:00 早餐後</option>
-                            <option value="08:30">08:30 早餐後</option>
-                            <option value="09:00">09:00 上午</option>
-                            <option value="09:30">09:30 上午</option>
-                            <option value="10:00">10:00 上午</option>
-                            <option value="10:30">10:30 上午</option>
-                            <option value="11:00">11:00 上午</option>
-                            <option value="11:30">11:30 上午</option>
-                        </optgroup>
-                        <optgroup label="中午">
-                            <option value="12:00">12:00 午餐前</option>
-                            <option value="12:30">12:30 午餐後</option>
-                            <option value="13:00">13:00 午餐後</option>
-                            <option value="13:30">13:30 下午</option>
-                            <option value="14:00">14:00 下午</option>
-                            <option value="14:30">14:30 下午</option>
-                        </optgroup>
-                        <optgroup label="傍晚">
-                            <option value="15:00">15:00 下午</option>
-                            <option value="15:30">15:30 下午</option>
-                            <option value="16:00">16:00 下午茶</option>
-                            <option value="16:30">16:30 下午茶</option>
-                            <option value="17:00">17:00 傍晚</option>
-                            <option value="17:30">17:30 傍晚</option>
-                        </optgroup>
-                        <optgroup label="晚上">
-                            <option value="18:00">18:00 晚餐前</option>
-                            <option value="18:30">18:30 晚餐後</option>
-                            <option value="19:00">19:00 晚餐後</option>
-                            <option value="19:30">19:30 晚餐後</option>
-                            <option value="20:00">20:00 晚上</option>
-                            <option value="20:30">20:30 晚上</option>
-                            <option value="21:00">21:00 晚上</option>
-                            <option value="21:30">21:30 晚上</option>
-                        </optgroup>
-                        <optgroup label="睡前">
-                            <option value="22:00">22:00 睡前</option>
-                            <option value="22:30">22:30 睡前</option>
-                            <option value="23:00">23:00 睡前</option>
-                            <option value="23:30">23:30 深夜</option>
-                            <option value="00:00">00:00 午夜</option>
-                        </optgroup>
-                    </select>
+                <div id="timeFieldsContainer">
+                    <div class="form-group">
+                        <label>服用時間 *</label>
+                        <select id="medTime1" required>
+                            <option value="">請選擇時間</option>
+                            <optgroup label="清晨">
+                                <option value="06:00">06:00 清晨</option>
+                                <option value="06:30">06:30 清晨</option>
+                                <option value="07:00">07:00 清晨</option>
+                                <option value="07:30">07:30 清晨</option>
+                            </optgroup>
+                            <optgroup label="早上">
+                                <option value="08:00">08:00 早餐後</option>
+                                <option value="08:30">08:30 早餐後</option>
+                                <option value="09:00">09:00 上午</option>
+                                <option value="09:30">09:30 上午</option>
+                                <option value="10:00">10:00 上午</option>
+                                <option value="10:30">10:30 上午</option>
+                                <option value="11:00">11:00 上午</option>
+                                <option value="11:30">11:30 上午</option>
+                            </optgroup>
+                            <optgroup label="中午">
+                                <option value="12:00">12:00 午餐前</option>
+                                <option value="12:30">12:30 午餐後</option>
+                                <option value="13:00">13:00 午餐後</option>
+                                <option value="13:30">13:30 下午</option>
+                                <option value="14:00">14:00 下午</option>
+                                <option value="14:30">14:30 下午</option>
+                            </optgroup>
+                            <optgroup label="傍晚">
+                                <option value="15:00">15:00 下午</option>
+                                <option value="15:30">15:30 下午</option>
+                                <option value="16:00">16:00 下午茶</option>
+                                <option value="16:30">16:30 下午茶</option>
+                                <option value="17:00">17:00 傍晚</option>
+                                <option value="17:30">17:30 傍晚</option>
+                            </optgroup>
+                            <optgroup label="晚上">
+                                <option value="18:00">18:00 晚餐前</option>
+                                <option value="18:30">18:30 晚餐後</option>
+                                <option value="19:00">19:00 晚餐後</option>
+                                <option value="19:30">19:30 晚餐後</option>
+                                <option value="20:00">20:00 晚上</option>
+                                <option value="20:30">20:30 晚上</option>
+                                <option value="21:00">21:00 晚上</option>
+                                <option value="21:30">21:30 晚上</option>
+                            </optgroup>
+                            <optgroup label="睡前">
+                                <option value="22:00">22:00 睡前</option>
+                                <option value="22:30">22:30 睡前</option>
+                                <option value="23:00">23:00 睡前</option>
+                                <option value="23:30">23:30 深夜</option>
+                                <option value="00:00">00:00 午夜</option>
+                            </optgroup>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>備註</label>
@@ -770,6 +799,40 @@
                 </div>
                 <div class="btn-group">
                     <button type="button" class="btn-secondary" onclick="closeAddMedicineModal()">取消</button>
+                    <button type="submit" class="btn-primary" style="flex: 1;">新增</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 新增家庭成員 Modal -->
+    <div id="addMemberModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>新增家庭成員</h3>
+                <button class="close-btn" onclick="closeAddMemberModal()">&times;</button>
+            </div>
+            <form onsubmit="handleAddMember(event)">
+                <div class="form-group">
+                    <label>姓名 *</label>
+                    <input type="text" id="memberName" required placeholder="例：媽媽、爸爸、王小明">
+                </div>
+                <div class="form-group">
+                    <label>關係</label>
+                    <select id="memberRelation">
+                        <option value="父親">父親</option>
+                        <option value="母親">母親</option>
+                        <option value="配偶">配偶</option>
+                        <option value="子女">子女</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>出生日期</label>
+                    <input type="date" id="memberBirthday">
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn-secondary" onclick="closeAddMemberModal()">取消</button>
                     <button type="submit" class="btn-primary" style="flex: 1;">新增</button>
                 </div>
             </form>
@@ -807,6 +870,7 @@
         let currentUser = null;
         let medicines = [];
         let todaySchedule = [];
+        let familyMembers = [];
 
         // 檢查登入狀態
         auth.onAuthStateChanged(user => {
@@ -841,27 +905,41 @@
             if (userDoc.exists) {
                 const userData = userDoc.data();
                 document.getElementById('settingsName').value = userData.name || '';
+                document.getElementById('settingsBirthday').value = userData.birthday || '';
             }
 
             // 載入資料
+            await loadFamilyMembers();
             await loadMedicines();
             updateDashboard();
         }
 
         // 載入藥物
         async function loadMedicines() {
-            const snapshot = await db.collection('medicines')
-                .where('userId', '==', currentUser.uid)
-                .orderBy('createdAt', 'desc')
-                .get();
+            try {
+                const snapshot = await db.collection('medicines')
+                    .where('userId', '==', currentUser.uid)
+                    .get();
 
-            medicines = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+                medicines = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                // 在客戶端排序
+                medicines.sort((a, b) => {
+                    if (b.createdAt && a.createdAt) {
+                        return b.createdAt.toMillis() - a.createdAt.toMillis();
+                    }
+                    return 0;
+                });
 
-            renderMedicinesList();
-            generateTodaySchedule();
+                renderMedicinesList();
+                generateTodaySchedule();
+            } catch (error) {
+                console.error('載入藥物錯誤:', error);
+                showToast('載入藥物失敗：' + error.message, 'error');
+            }
         }
 
         // 生成今日排程
@@ -870,17 +948,24 @@
             todaySchedule = [];
 
             medicines.forEach(med => {
-                if (med.frequency === 'daily') {
-                    const scheduleItem = {
-                        medicineId: med.id,
-                        name: med.name,
-                        dosage: med.dosage,
-                        time: med.time,
-                        taken: false,
-                        date: today
-                    };
-                    todaySchedule.push(scheduleItem);
-                }
+                // 解析服用時間（可能是陣列）
+                const times = Array.isArray(med.times) ? med.times : [med.time];
+                
+                times.forEach(time => {
+                    if (med.frequency === 'once' || med.frequency === 'twice' || 
+                        med.frequency === 'three' || med.frequency === 'daily') {
+                        const scheduleItem = {
+                            medicineId: med.id,
+                            name: med.name,
+                            dosage: med.dosage,
+                            time: time,
+                            member: med.member || 'self',
+                            taken: false,
+                            date: today
+                        };
+                        todaySchedule.push(scheduleItem);
+                    }
+                });
             });
 
             // 檢查已服用記錄
@@ -891,7 +976,9 @@
                 .then(snapshot => {
                     snapshot.forEach(doc => {
                         const record = doc.data();
-                        const item = todaySchedule.find(s => s.medicineId === record.medicineId);
+                        const item = todaySchedule.find(s => 
+                            s.medicineId === record.medicineId && s.time === record.time
+                        );
                         if (item) item.taken = true;
                     });
                     renderTodaySchedule();
@@ -948,20 +1035,26 @@
                 return;
             }
 
-            container.innerHTML = medicines.map(med => `
-                <div class="med-item">
-                    <div class="med-icon">💊</div>
-                    <div class="med-info">
-                        <div class="med-name">${med.name}</div>
-                        <div class="med-dosage">${med.dosage} • ${getFrequencyText(med.frequency)} • ${med.time}</div>
-                        ${med.notes ? `<div class="med-dosage" style="margin-top: 5px;">📝 ${med.notes}</div>` : ''}
+            container.innerHTML = medicines.map(med => {
+                const times = Array.isArray(med.times) ? med.times.join('、') : med.time;
+                const memberName = med.member === 'self' ? '本人' : 
+                    (familyMembers.find(m => m.id === med.member)?.name || '本人');
+                
+                return `
+                    <div class="med-item">
+                        <div class="med-icon">💊</div>
+                        <div class="med-info">
+                            <div class="med-name">${med.name} ${memberName !== '本人' ? '(' + memberName + ')' : ''}</div>
+                            <div class="med-dosage">${med.dosage} • ${getFrequencyText(med.frequency)} • ${times}</div>
+                            ${med.notes ? `<div class="med-dosage" style="margin-top: 5px;">📝 ${med.notes}</div>` : ''}
+                        </div>
+                        <button class="btn-secondary" onclick="deleteMedicine('${med.id}')" 
+                                style="padding: 8px 15px; border-color: #f44336; color: #f44336;">
+                            刪除
+                        </button>
                     </div>
-                    <button class="btn-secondary" onclick="deleteMedicine('${med.id}')" 
-                            style="padding: 8px 15px; border-color: #f44336; color: #f44336;">
-                        刪除
-                    </button>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         // 更新統計
@@ -1005,8 +1098,9 @@
                 await db.collection('records').add({
                     userId: currentUser.uid,
                     medicineId: item.medicineId,
+                    time: item.time,  // 記錄特定時間
                     date: today,
-                    time: new Date().toTimeString().split(' ')[0],
+                    actualTime: new Date().toTimeString().split(' ')[0],
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 showToast('已記錄服藥', 'success');
@@ -1015,6 +1109,7 @@
                 const snapshot = await db.collection('records')
                     .where('userId', '==', currentUser.uid)
                     .where('medicineId', '==', item.medicineId)
+                    .where('time', '==', item.time)
                     .where('date', '==', today)
                     .get();
                 
@@ -1030,12 +1125,29 @@
         async function handleAddMedicine(event) {
             event.preventDefault();
 
+            const frequency = document.getElementById('medFrequency').value;
+            const times = [];
+            
+            // 收集所有時間
+            if (frequency === 'twice') {
+                times.push(document.getElementById('medTime1').value);
+                times.push(document.getElementById('medTime2').value);
+            } else if (frequency === 'three') {
+                times.push(document.getElementById('medTime1').value);
+                times.push(document.getElementById('medTime2').value);
+                times.push(document.getElementById('medTime3').value);
+            } else {
+                times.push(document.getElementById('medTime1').value);
+            }
+
             const medicine = {
                 userId: currentUser.uid,
+                member: document.getElementById('medMember').value,
                 name: document.getElementById('medName').value,
                 dosage: document.getElementById('medDosage').value,
-                frequency: document.getElementById('medFrequency').value,
-                time: document.getElementById('medTime').value,
+                frequency: frequency,
+                times: times,  // 儲存為陣列
+                time: times[0], // 保留第一個時間作為主要時間
                 notes: document.getElementById('medNotes').value,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
@@ -1047,10 +1159,11 @@
                 showToast('✅ 藥物新增成功！', 'success');
                 
                 // 彈出確認視窗
+                const timesText = times.length > 1 ? times.join('、') : times[0];
                 alert('✅ 藥物新增成功！\n\n' + 
                       '藥物：' + medicine.name + '\n' +
                       '劑量：' + medicine.dosage + '\n' +
-                      '時間：' + medicine.time);
+                      '時間：' + timesText);
                 
                 closeAddMedicineModal();
                 await loadMedicines();
@@ -1090,54 +1203,201 @@
             }
         }
 
+        // 載入家庭成員
+        async function loadFamilyMembers() {
+            try {
+                const snapshot = await db.collection('familyMembers')
+                    .where('userId', '==', currentUser.uid)
+                    .get();
+
+                familyMembers = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                renderFamilyMembers();
+                updateMemberSelector();
+            } catch (error) {
+                console.error('載入家庭成員錯誤:', error);
+            }
+        }
+
+        // 渲染家庭成員列表
+        function renderFamilyMembers() {
+            const container = document.getElementById('membersList');
+            
+            if (familyMembers.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">👤</div>
+                        <p>尚未新增家庭成員</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = familyMembers.map(member => `
+                <div class="med-item">
+                    <div class="med-icon">👤</div>
+                    <div class="med-info">
+                        <div class="med-name">${member.name}</div>
+                        <div class="med-dosage">${member.relation}${member.birthday ? ' • ' + member.birthday : ''}</div>
+                    </div>
+                    <button class="btn-secondary" onclick="deleteMember('${member.id}')" 
+                            style="padding: 8px 15px; border-color: #f44336; color: #f44336;">
+                        刪除
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // 更新藥物表單的成員選擇器
+        function updateMemberSelector() {
+            const selector = document.getElementById('medMember');
+            selector.innerHTML = '<option value="self">本人</option>';
+            
+            familyMembers.forEach(member => {
+                selector.innerHTML += `<option value="${member.id}">${member.name}</option>`;
+            });
+        }
+
+        // 新增家庭成員
+        async function handleAddMember(event) {
+            event.preventDefault();
+
+            const member = {
+                userId: currentUser.uid,
+                name: document.getElementById('memberName').value,
+                relation: document.getElementById('memberRelation').value,
+                birthday: document.getElementById('memberBirthday').value,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            try {
+                await db.collection('familyMembers').add(member);
+                showToast('✅ 家庭成員新增成功！', 'success');
+                alert('✅ 家庭成員新增成功！\n\n姓名：' + member.name);
+                closeAddMemberModal();
+                await loadFamilyMembers();
+            } catch (error) {
+                console.error('新增家庭成員錯誤:', error);
+                showToast('❌ 新增失敗：' + error.message, 'error');
+                alert('❌ 新增家庭成員失敗\n\n錯誤：' + error.message);
+            }
+        }
+
+        // 刪除家庭成員
+        async function deleteMember(id) {
+            const member = familyMembers.find(m => m.id === id);
+            if (!confirm('確定要刪除 ' + member.name + ' 嗎？')) return;
+
+            try {
+                await db.collection('familyMembers').doc(id).delete();
+                showToast('✅ 已刪除家庭成員', 'success');
+                await loadFamilyMembers();
+            } catch (error) {
+                showToast('❌ 刪除失敗：' + error.message, 'error');
+            }
+        }
+
+        // 更新服用時間欄位
+        function updateTimeFields() {
+            const frequency = document.getElementById('medFrequency').value;
+            const container = document.getElementById('timeFieldsContainer');
+            const timeSelect = document.getElementById('medTime1');
+            const timeOptions = timeSelect.innerHTML;
+
+            if (frequency === 'twice') {
+                container.innerHTML = `
+                    <div class="form-group">
+                        <label>早上服用時間 *</label>
+                        <select id="medTime1" required>${timeOptions}</select>
+                    </div>
+                    <div class="form-group">
+                        <label>晚上服用時間 *</label>
+                        <select id="medTime2" required>${timeOptions}</select>
+                    </div>
+                `;
+            } else if (frequency === 'three') {
+                container.innerHTML = `
+                    <div class="form-group">
+                        <label>早上服用時間 *</label>
+                        <select id="medTime1" required>${timeOptions}</select>
+                    </div>
+                    <div class="form-group">
+                        <label>中午服用時間 *</label>
+                        <select id="medTime2" required>${timeOptions}</select>
+                    </div>
+                    <div class="form-group">
+                        <label>晚上服用時間 *</label>
+                        <select id="medTime3" required>${timeOptions}</select>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="form-group">
+                        <label>服用時間 *</label>
+                        <select id="medTime1" required>${timeOptions}</select>
+                    </div>
+                `;
+            }
+        }
+
         // 儲存設定
         async function saveSettings() {
             const name = document.getElementById('settingsName').value;
+            const birthday = document.getElementById('settingsBirthday').value;
             
             try {
                 await currentUser.updateProfile({ displayName: name });
-                await db.collection('users').doc(currentUser.uid).update({ name });
+                
+                // 嘗試更新，如果不存在則建立
+                try {
+                    await db.collection('users').doc(currentUser.uid).update({ 
+                        name: name,
+                        birthday: birthday
+                    });
+                } catch (updateError) {
+                    // 如果文件不存在，建立新的
+                    await db.collection('users').doc(currentUser.uid).set({ 
+                        name: name,
+                        birthday: birthday,
+                        email: currentUser.email,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
                 
                 // 顯示成功訊息
                 showToast('✅ 設定已儲存', 'success');
-                
-                // 彈出確認視窗
-                alert('✅ 設定已成功儲存！\n\n姓名：' + name);
+                alert('✅ 設定已成功儲存！\n\n姓名：' + name + (birthday ? '\n出生日期：' + birthday : ''));
                 
                 initializePage();
             } catch (error) {
                 console.error('儲存設定錯誤:', error);
-                
-                // 如果用戶資料不存在，嘗試建立
-                if (error.code === 'not-found') {
-                    try {
-                        await db.collection('users').doc(currentUser.uid).set({ 
-                            name: name,
-                            email: currentUser.email,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        showToast('✅ 設定已儲存', 'success');
-                        alert('✅ 設定已成功儲存！\n\n姓名：' + name);
-                        initializePage();
-                    } catch (createError) {
-                        showToast('❌ 儲存失敗：' + createError.message, 'error');
-                        alert('❌ 儲存設定失敗\n\n錯誤：' + createError.message);
-                    }
-                } else {
-                    showToast('❌ 儲存失敗：' + error.message, 'error');
-                    alert('❌ 儲存設定失敗\n\n錯誤：' + error.message);
-                }
+                showToast('❌ 儲存失敗：' + error.message, 'error');
+                alert('❌ 儲存設定失敗\n\n錯誤：' + error.message);
             }
         }
 
         // Modal 控制
         function openAddMedicineModal() {
+            updateMemberSelector(); // 更新成員列表
             document.getElementById('addMedicineModal').classList.add('active');
         }
 
         function closeAddMedicineModal() {
             document.getElementById('addMedicineModal').classList.remove('active');
             document.querySelector('#addMedicineModal form').reset();
+            updateTimeFields(); // 重置時間欄位
+        }
+
+        function openAddMemberModal() {
+            document.getElementById('addMemberModal').classList.add('active');
+        }
+
+        function closeAddMemberModal() {
+            document.getElementById('addMemberModal').classList.remove('active');
+            document.querySelector('#addMemberModal form').reset();
         }
 
         // 頁面切換
@@ -1184,15 +1444,28 @@
         }
 
         function getFrequencyText(freq) {
-            const map = { daily: '每日', weekly: '每週', asNeeded: '需要時' };
+            const map = { 
+                once: '每日一次',
+                twice: '每日兩次', 
+                three: '每日三次',
+                daily: '每日', 
+                weekly: '每週', 
+                asNeeded: '需要時',
+                custom: '自訂'
+            };
             return map[freq] || freq;
         }
 
         // 點擊 modal 外部關閉
         window.onclick = function(event) {
-            const modal = document.getElementById('addMedicineModal');
-            if (event.target === modal) {
+            const medicineModal = document.getElementById('addMedicineModal');
+            const memberModal = document.getElementById('addMemberModal');
+            
+            if (event.target === medicineModal) {
                 closeAddMedicineModal();
+            }
+            if (event.target === memberModal) {
+                closeAddMemberModal();
             }
         }
     </script>
