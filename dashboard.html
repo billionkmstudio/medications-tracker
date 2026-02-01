@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>用藥記錄系統 - 主頁</title>
+    <title>我的用藥日記 - 主頁</title>
     <style>
         * {
             margin: 0;
@@ -507,7 +507,7 @@
     <div class="sidebar">
         <div class="sidebar-header">
             <span class="icon">💊</span>
-            <h1>用藥記錄</h1>
+            <h1>MyMedLog</h1>
         </div>
         <nav>
             <a href="#" class="nav-item active" onclick="showPage('home')">
@@ -711,7 +711,58 @@
                 </div>
                 <div class="form-group">
                     <label>服用時間 *</label>
-                    <input type="time" id="medTime" required>
+                    <select id="medTime" required>
+                        <option value="">請選擇時間</option>
+                        <optgroup label="清晨">
+                            <option value="06:00">06:00 清晨</option>
+                            <option value="06:30">06:30 清晨</option>
+                            <option value="07:00">07:00 清晨</option>
+                            <option value="07:30">07:30 清晨</option>
+                        </optgroup>
+                        <optgroup label="早上">
+                            <option value="08:00">08:00 早餐後</option>
+                            <option value="08:30">08:30 早餐後</option>
+                            <option value="09:00">09:00 上午</option>
+                            <option value="09:30">09:30 上午</option>
+                            <option value="10:00">10:00 上午</option>
+                            <option value="10:30">10:30 上午</option>
+                            <option value="11:00">11:00 上午</option>
+                            <option value="11:30">11:30 上午</option>
+                        </optgroup>
+                        <optgroup label="中午">
+                            <option value="12:00">12:00 午餐前</option>
+                            <option value="12:30">12:30 午餐後</option>
+                            <option value="13:00">13:00 午餐後</option>
+                            <option value="13:30">13:30 下午</option>
+                            <option value="14:00">14:00 下午</option>
+                            <option value="14:30">14:30 下午</option>
+                        </optgroup>
+                        <optgroup label="傍晚">
+                            <option value="15:00">15:00 下午</option>
+                            <option value="15:30">15:30 下午</option>
+                            <option value="16:00">16:00 下午茶</option>
+                            <option value="16:30">16:30 下午茶</option>
+                            <option value="17:00">17:00 傍晚</option>
+                            <option value="17:30">17:30 傍晚</option>
+                        </optgroup>
+                        <optgroup label="晚上">
+                            <option value="18:00">18:00 晚餐前</option>
+                            <option value="18:30">18:30 晚餐後</option>
+                            <option value="19:00">19:00 晚餐後</option>
+                            <option value="19:30">19:30 晚餐後</option>
+                            <option value="20:00">20:00 晚上</option>
+                            <option value="20:30">20:30 晚上</option>
+                            <option value="21:00">21:00 晚上</option>
+                            <option value="21:30">21:30 晚上</option>
+                        </optgroup>
+                        <optgroup label="睡前">
+                            <option value="22:00">22:00 睡前</option>
+                            <option value="22:30">22:30 睡前</option>
+                            <option value="23:00">23:00 睡前</option>
+                            <option value="23:30">23:30 深夜</option>
+                            <option value="00:00">00:00 午夜</option>
+                        </optgroup>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>備註</label>
