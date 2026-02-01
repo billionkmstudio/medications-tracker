@@ -1937,7 +1937,8 @@
                 const takenRecords = {};
                 recordsSnapshot.forEach(doc => {
                     const record = doc.data();
-                    const key = `${record.date}_${record.medicineId}`;
+                    // 修復：包含時間在 key 中，以支援一天多次服藥
+                    const key = `${record.date}_${record.medicineId}_${record.time}`;
                     takenRecords[key] = true;
                 });
 
@@ -1971,29 +1972,36 @@
                     // 如果開始日期晚於結束日期，跳過
                     if (checkStart > checkEnd) return;
 
+                    // 處理每日多次服藥的情況
+                    const times = Array.isArray(med.times) ? med.times : [med.time];
+
                     // 檢查每一天
                     for (let d = new Date(checkStart); d <= checkEnd; d.setDate(d.getDate() + 1)) {
                         const dateStr = d.toISOString().split('T')[0];
-                        const key = `${dateStr}_${med.id}`;
                         
-                        // 如果這天應該服用但沒有記錄，就是錯過了
-                        if (!takenRecords[key]) {
-                            missedRecords.push({
-                                date: dateStr,
-                                medicineId: med.id,
-                                medicineName: med.name,
-                                dosage: med.dosage,
-                                time: med.time,
-                                member: med.member
-                            });
-                        }
+                        // 檢查每個服藥時間
+                        times.forEach(time => {
+                            const key = `${dateStr}_${med.id}_${time}`;
+                            
+                            // 如果這個時間點應該服用但沒有記錄，就是錯過了
+                            if (!takenRecords[key]) {
+                                missedRecords.push({
+                                    date: dateStr,
+                                    medicineId: med.id,
+                                    medicineName: med.name,
+                                    dosage: med.dosage,
+                                    time: time,
+                                    member: med.member
+                                });
+                            }
+                        });
                     }
                 });
 
                 // 計算統計
                 const totalMissed = missedRecords.length;
                 
-                // 計算總計劃劑量（使用相同的邏輯）
+                // 計算總計劃劑量（使用相同的邏輯，並考慮一天多次服藥）
                 let totalPlanned = 0;
                 medicines.forEach(med => {
                     if (med.frequency === 'asNeeded') return;
@@ -2017,7 +2025,12 @@
                     if (checkStart > checkEnd) return;
                     
                     const days = Math.floor((checkEnd - checkStart) / (1000 * 60 * 60 * 24)) + 1;
-                    if (days > 0) totalPlanned += days;
+                    
+                    // 修復：考慮一天多次服藥
+                    const times = Array.isArray(med.times) ? med.times : [med.time];
+                    const timesPerDay = times.length;
+                    
+                    if (days > 0) totalPlanned += (days * timesPerDay);
                 });
 
                 const complianceRate = totalPlanned > 0 
