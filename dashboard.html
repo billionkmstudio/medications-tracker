@@ -585,6 +585,19 @@
     </style>
 </head>
 <body>
+    <!-- 載入畫面 -->
+    <div id="loadingScreen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10000; color: white;">
+        <div style="font-size: 60px; margin-bottom: 20px;">💊</div>
+        <h2 style="margin-bottom: 10px;">用藥日記</h2>
+        <p>載入中...</p>
+        <div style="width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; margin-top: 20px;"></div>
+    </div>
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+
     <!-- 側邊欄 -->
     <div class="sidebar">
         <div class="sidebar-header">
@@ -981,30 +994,46 @@
 
         // 初始化頁面
         async function initializePage() {
-            // 設定使用者資訊
-            const userName = currentUser.displayName || currentUser.email.split('@')[0];
-            document.getElementById('userName').textContent = `你好，${userName}！`;
-            document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
-            
-            // 設定日期
-            const today = new Date();
-            document.getElementById('currentDate').textContent = today.toLocaleDateString('zh-TW', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                weekday: 'long'
-            });
+            try {
+                // 設定使用者資訊
+                const userName = currentUser.displayName || currentUser.email.split('@')[0];
+                document.getElementById('userName').textContent = `你好，${userName}！`;
+                document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
+                
+                // 設定日期
+                const today = new Date();
+                document.getElementById('currentDate').textContent = today.toLocaleDateString('zh-TW', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'long'
+                });
 
-            // 載入使用者設定
-            await loadUserSettings();
-            
-            // 載入資料
-            await loadFamilyMembers();
-            await loadMedicines();
-            await loadTodayRecords();
-            
-            // 更新首頁
-            updateHomePage();
+                // 載入使用者設定
+                await loadUserSettings();
+                
+                // 載入資料
+                await loadFamilyMembers();
+                await loadMedicines();
+                await loadTodayRecords();
+                
+                // 更新首頁
+                updateHomePage();
+                
+                // 移除載入畫面
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) {
+                    loadingScreen.style.opacity = '0';
+                    loadingScreen.style.transition = 'opacity 0.3s';
+                    setTimeout(() => loadingScreen.remove(), 300);
+                }
+            } catch (error) {
+                console.error('初始化錯誤:', error);
+                showToast('初始化失敗: ' + error.message, 'error');
+                // 仍然移除載入畫面
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) loadingScreen.remove();
+            }
         }
 
         // 載入使用者設定
@@ -1124,53 +1153,63 @@
 
         // 檢查是否需要發送提醒
         async function checkReminders() {
-            if (!userSettings.enableReminders) return;
-            if (Notification.permission !== 'granted') return;
+            try {
+                if (!userSettings.enableReminders) return;
+                if (!('Notification' in window)) return;
+                if (Notification.permission !== 'granted') return;
+                if (!medicines || medicines.length === 0) return;
 
-            const now = new Date();
-            const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-            
-            // 計算提醒時間
-            const reminderTime = new Date(now.getTime() + userSettings.reminderMinutes * 60000);
-            const reminderTimeStr = `${String(reminderTime.getHours()).padStart(2, '0')}:${String(reminderTime.getMinutes()).padStart(2, '0')}`;
-
-            // 檢查今天還未服用的藥物
-            for (const med of medicines) {
-                if (!med.reminderEnabled) continue;
+                const now = new Date();
+                const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
                 
-                // 檢查是否已經服用
-                const alreadyTaken = todayRecords.some(r => r.medicineId === med.id);
-                if (alreadyTaken) continue;
+                // 計算提醒時間
+                const reminderTime = new Date(now.getTime() + userSettings.reminderMinutes * 60000);
+                const reminderTimeStr = `${String(reminderTime.getHours()).padStart(2, '0')}:${String(reminderTime.getMinutes()).padStart(2, '0')}`;
 
-                // 檢查時間是否匹配
-                if (med.time === reminderTimeStr || med.time === currentTime) {
-                    sendNotification(med);
+                // 檢查今天還未服用的藥物
+                for (const med of medicines) {
+                    if (!med.reminderEnabled && med.reminderEnabled !== undefined) continue;
+                    
+                    // 檢查是否已經服用
+                    const alreadyTaken = todayRecords.some(r => r.medicineId === med.id);
+                    if (alreadyTaken) continue;
+
+                    // 檢查時間是否匹配
+                    if (med.time === reminderTimeStr || med.time === currentTime) {
+                        sendNotification(med);
+                    }
                 }
+            } catch (error) {
+                console.error('檢查提醒錯誤:', error);
             }
         }
 
         // 發送通知
         function sendNotification(medicine) {
-            const member = familyMembers.find(m => m.id === medicine.member);
-            const memberText = member ? ` (${member.name})` : '';
-            
-            const notification = new Notification('⏰ 用藥提醒', {
-                body: `該服用 ${medicine.name}${memberText} 了！\n劑量：${medicine.dosage}`,
-                icon: '💊',
-                tag: medicine.id, // 避免重複通知
-                requireInteraction: true
-            });
+            try {
+                const member = familyMembers.find(m => m.id === medicine.member);
+                const memberText = (member && member.id !== 'self') ? ` (${member.name})` : '';
+                
+                const notification = new Notification('⏰ 用藥提醒', {
+                    body: `該服用 ${medicine.name}${memberText} 了！\n劑量：${medicine.dosage}`,
+                    icon: '💊',
+                    tag: medicine.id, // 避免重複通知
+                    requireInteraction: true
+                });
 
-            // 播放提醒音效
-            if (userSettings.soundEnabled) {
-                playReminderSound();
+                // 播放提醒音效
+                if (userSettings.soundEnabled) {
+                    playReminderSound();
+                }
+
+                notification.onclick = () => {
+                    window.focus();
+                    notification.close();
+                    showPage('home');
+                };
+            } catch (error) {
+                console.error('發送通知錯誤:', error);
             }
-
-            notification.onclick = () => {
-                window.focus();
-                notification.close();
-                showPage('home');
-            };
         }
 
         // 播放提醒音效
@@ -1365,6 +1404,30 @@
 
         // 更新首頁
         function updateHomePage() {
+            // 確保資料已載入
+            if (!medicines || medicines.length === 0) {
+                document.getElementById('todayTotal').textContent = '0';
+                document.getElementById('takenCount').textContent = '0';
+                document.getElementById('pendingCount').textContent = '0';
+                document.getElementById('missedCount').textContent = '0';
+                
+                document.getElementById('todayList').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">💊</div>
+                        <p>尚未新增任何藥物</p>
+                        <p style="font-size: 14px; margin-top: 10px;">前往「我的藥物」新增第一個藥物</p>
+                    </div>
+                `;
+                
+                document.getElementById('upcomingList').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📅</div>
+                        <p>無即將到來的用藥</p>
+                    </div>
+                `;
+                return;
+            }
+
             const today = new Date();
             const todayStr = today.toISOString().split('T')[0];
             const currentTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
@@ -1614,7 +1677,15 @@
 
             } catch (error) {
                 console.error('載入忘記食藥報表錯誤:', error);
-                showToast('載入失敗', 'error');
+                document.getElementById('totalMissed').textContent = '0';
+                document.getElementById('complianceRate').textContent = '100%';
+                document.getElementById('mostMissedMed').textContent = '-';
+                document.getElementById('missedList').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">❌</div>
+                        <p>載入失敗：${error.message}</p>
+                    </div>
+                `;
             }
         }
 
@@ -2052,10 +2123,14 @@
                 document.getElementById(p + 'Page').style.display = p === page ? 'block' : 'none';
             });
 
-            document.querySelectorAll('.nav-item').forEach(item => {
+            // 更新導航項目的 active 狀態
+            document.querySelectorAll('.nav-item').forEach((item, index) => {
                 item.classList.remove('active');
+                const pageNames = ['home', 'medicines', 'schedule', 'history', 'missed', 'settings'];
+                if (pageNames[index] === page) {
+                    item.classList.add('active');
+                }
             });
-            event.target.closest('.nav-item').classList.add('active');
 
             if (page === 'schedule') {
                 renderSchedule();
