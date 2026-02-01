@@ -956,6 +956,7 @@
         let medicines = [];
         let todaySchedule = [];
         let familyMembers = [];
+        let isInitialized = false; // 添加初始化標記
 
         // 檢查登入狀態
         auth.onAuthStateChanged(user => {
@@ -963,7 +964,14 @@
                 window.location.href = 'index.html';
                 return;
             }
+            
+            // 防止重複初始化
+            if (isInitialized) {
+                return;
+            }
+            
             currentUser = user;
+            isInitialized = true;
             initializePage();
         });
 
@@ -1044,7 +1052,7 @@
                             name: med.name,
                             dosage: med.dosage,
                             time: time,
-                            member: med.member || 'self',
+                            member: med.member || med.memberId || 'self', // 支援多種欄位名稱
                             taken: false,
                             date: today
                         };
@@ -1084,7 +1092,10 @@
             // 篩選排程
             let filteredSchedule = todaySchedule;
             if (filter !== 'all') {
-                filteredSchedule = todaySchedule.filter(item => item.member === filter);
+                filteredSchedule = todaySchedule.filter(item => {
+                    const itemMember = item.member || item.memberId || 'self';
+                    return itemMember === filter;
+                });
             }
 
             if (filteredSchedule.length === 0) {
@@ -1361,7 +1372,8 @@
                 'homeFilter',
                 'medicinesFilter', 
                 'scheduleMemberFilter',
-                'historyMemberFilter'
+                'historyMemberFilter',
+                'missedMemberFilter'
             ];
 
             filters.forEach(filterId => {
