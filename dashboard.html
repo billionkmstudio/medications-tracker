@@ -578,7 +578,14 @@
                 <div class="content-section">
                     <div class="section-header">
                         <h3>📋 今日用藥清單</h3>
-                        <a href="#" style="color: #667eea; text-decoration: none; font-size: 14px;" onclick="showPage('schedule')">查看全部 →</a>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <select id="homeFilter" onchange="filterTodaySchedule()" 
+                                    style="padding: 6px 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                                <option value="all">全部成員</option>
+                                <option value="self">本人</option>
+                            </select>
+                            <a href="#" style="color: #667eea; text-decoration: none; font-size: 14px;" onclick="showPage('schedule')">查看全部 →</a>
+                        </div>
                     </div>
                     <div id="todayMedList" class="med-list">
                         <div class="empty-state">
@@ -617,7 +624,14 @@
             <div class="content-section">
                 <div class="section-header">
                     <h3>💊 我的藥物</h3>
-                    <button class="btn-primary" onclick="openAddMedicineModal()">+ 新增藥物</button>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="medicinesFilter" onchange="renderMedicinesList()" 
+                                style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                            <option value="all">全部成員</option>
+                            <option value="self">本人</option>
+                        </select>
+                        <button class="btn-primary" onclick="openAddMedicineModal()">+ 新增藥物</button>
+                    </div>
                 </div>
                 <div id="medicinesList" class="med-list">
                     <div class="empty-state">
@@ -633,8 +647,14 @@
             <div class="content-section">
                 <div class="section-header">
                     <h3>📅 用藥排程</h3>
-                    <div>
-                        <select id="scheduleFilter" onchange="renderSchedule()" style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                    <div style="display: flex; gap: 10px;">
+                        <select id="scheduleMemberFilter" onchange="renderSchedule()" 
+                                style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                            <option value="all">全部成員</option>
+                            <option value="self">本人</option>
+                        </select>
+                        <select id="scheduleFilter" onchange="renderSchedule()" 
+                                style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
                             <option value="today">今日</option>
                             <option value="week">本週</option>
                             <option value="all">全部</option>
@@ -650,8 +670,14 @@
             <div class="content-section">
                 <div class="section-header">
                     <h3>📋 歷史記錄</h3>
-                    <div>
-                        <select id="historyFilter" onchange="loadHistory()" style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                    <div style="display: flex; gap: 10px;">
+                        <select id="historyMemberFilter" onchange="loadHistory()" 
+                                style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                            <option value="all">全部成員</option>
+                            <option value="self">本人</option>
+                        </select>
+                        <select id="historyFilter" onchange="loadHistory()" 
+                                style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
                             <option value="7">最近 7 天</option>
                             <option value="30">最近 30 天</option>
                             <option value="90">最近 3 個月</option>
@@ -993,25 +1019,46 @@
 
         // 渲染今日排程
         function renderTodaySchedule() {
+            filterTodaySchedule(); // 使用篩選函數
+        }
+
+        // 篩選今日排程
+        function filterTodaySchedule() {
             const container = document.getElementById('todayMedList');
+            const filter = document.getElementById('homeFilter')?.value || 'all';
             
-            if (todaySchedule.length === 0) {
+            // 篩選排程
+            let filteredSchedule = todaySchedule;
+            if (filter !== 'all') {
+                filteredSchedule = todaySchedule.filter(item => item.member === filter);
+            }
+
+            if (filteredSchedule.length === 0) {
+                const filterName = filter === 'self' ? '本人' : 
+                    (filter === 'all' ? '' : familyMembers.find(m => m.id === filter)?.name);
+                
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="icon">💊</div>
-                        <p>今日無用藥排程</p>
+                        <p>${filterName ? filterName + ' ' : ''}今日無用藥排程</p>
                     </div>
                 `;
                 return;
             }
 
-            todaySchedule.sort((a, b) => a.time.localeCompare(b.time));
+            filteredSchedule.sort((a, b) => a.time.localeCompare(b.time));
 
-            container.innerHTML = todaySchedule.map((item, index) => `
+            const getMemberBadge = (memberId) => {
+                if (memberId === 'self') return '';
+                const member = familyMembers.find(m => m.id === memberId);
+                return member ? ` <span style="background: #e3f2fd; color: #667eea; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${member.name}</span>` : '';
+            };
+
+            container.innerHTML = filteredSchedule.map((item, index) => `
                 <div class="med-item">
                     <div class="med-icon">💊</div>
                     <div class="med-info">
-                        <div class="med-name">${item.name}</div>
+                        <div class="med-name">${item.name}${getMemberBadge(item.member)}</div>
                         <div class="med-dosage">${item.dosage}</div>
                     </div>
                     <div class="med-time">
@@ -1019,7 +1066,7 @@
                         <div class="time-label">${getTimeLabel(item.time)}</div>
                     </div>
                     <button class="check-btn ${item.taken ? 'checked' : ''}" 
-                            onclick="toggleMedication(${index})">
+                            onclick="toggleMedication(${todaySchedule.indexOf(item)})">
                         ${item.taken ? '✓' : ''}
                     </button>
                 </div>
@@ -1029,27 +1076,40 @@
         // 渲染藥物列表
         function renderMedicinesList() {
             const container = document.getElementById('medicinesList');
+            const filter = document.getElementById('medicinesFilter')?.value || 'all';
             
-            if (medicines.length === 0) {
+            // 篩選藥物
+            let filteredMedicines = medicines;
+            if (filter !== 'all') {
+                filteredMedicines = medicines.filter(med => med.member === filter);
+            }
+            
+            if (filteredMedicines.length === 0) {
+                const filterName = filter === 'self' ? '本人' : 
+                    (filter === 'all' ? '' : familyMembers.find(m => m.id === filter)?.name);
+                
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="icon">💊</div>
-                        <p>尚未新增任何藥物</p>
+                        <p>${filterName ? filterName + ' ' : ''}尚未新增任何藥物</p>
                     </div>
                 `;
                 return;
             }
 
-            container.innerHTML = medicines.map(med => {
+            container.innerHTML = filteredMedicines.map(med => {
                 const times = Array.isArray(med.times) ? med.times.join('、') : med.time;
-                const memberName = med.member === 'self' ? '本人' : 
-                    (familyMembers.find(m => m.id === med.member)?.name || '本人');
+                const memberName = med.member === 'self' ? '' : 
+                    (familyMembers.find(m => m.id === med.member)?.name || '');
+                
+                const memberBadge = memberName ? 
+                    ` <span style="background: #e3f2fd; color: #667eea; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${memberName}</span>` : '';
                 
                 return `
                     <div class="med-item">
                         <div class="med-icon">💊</div>
                         <div class="med-info">
-                            <div class="med-name">${med.name} ${memberName !== '本人' ? '(' + memberName + ')' : ''}</div>
+                            <div class="med-name">${med.name}${memberBadge}</div>
                             <div class="med-dosage">${med.dosage} • ${getFrequencyText(med.frequency)} • ${times}</div>
                             ${med.notes ? `<div class="med-dosage" style="margin-top: 5px;">📝 ${med.notes}</div>` : ''}
                         </div>
@@ -1222,9 +1282,40 @@
 
                 renderFamilyMembers();
                 updateMemberSelector();
+                updateAllMemberFilters(); // 更新所有篩選器
             } catch (error) {
                 console.error('載入家庭成員錯誤:', error);
             }
+        }
+
+        // 更新所有頁面的成員篩選器
+        function updateAllMemberFilters() {
+            const filters = [
+                'homeFilter',
+                'medicinesFilter', 
+                'scheduleMemberFilter',
+                'historyMemberFilter'
+            ];
+
+            filters.forEach(filterId => {
+                const filter = document.getElementById(filterId);
+                if (!filter) return;
+
+                const currentValue = filter.value;
+                filter.innerHTML = `
+                    <option value="all">全部成員</option>
+                    <option value="self">本人</option>
+                `;
+
+                familyMembers.forEach(member => {
+                    filter.innerHTML += `<option value="${member.id}">${member.name}</option>`;
+                });
+
+                // 恢復之前的選擇
+                if (currentValue) {
+                    filter.value = currentValue;
+                }
+            });
         }
 
         // 渲染家庭成員列表
@@ -1409,12 +1500,22 @@
         function renderSchedule() {
             const container = document.getElementById('scheduleList');
             const filter = document.getElementById('scheduleFilter').value;
+            const memberFilter = document.getElementById('scheduleMemberFilter')?.value || 'all';
             
-            if (medicines.length === 0) {
+            // 篩選藥物
+            let filteredMedicines = medicines;
+            if (memberFilter !== 'all') {
+                filteredMedicines = medicines.filter(med => med.member === memberFilter);
+            }
+            
+            if (filteredMedicines.length === 0) {
+                const filterName = memberFilter === 'self' ? '本人' : 
+                    (memberFilter === 'all' ? '' : familyMembers.find(m => m.id === memberFilter)?.name);
+                
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="icon">📅</div>
-                        <p>尚未設定用藥排程</p>
+                        <p>${filterName ? filterName + ' ' : ''}尚未設定用藥排程</p>
                         <p style="font-size: 12px; margin-top: 10px;">請先到「藥物管理」新增藥物</p>
                     </div>
                 `;
@@ -1447,7 +1548,7 @@
                     items: []
                 };
 
-                medicines.forEach(med => {
+                filteredMedicines.forEach(med => {
                     const times = Array.isArray(med.times) ? med.times : [med.time];
                     times.forEach(time => {
                         if (med.frequency === 'once' || med.frequency === 'twice' || 
@@ -1466,17 +1567,17 @@
                 scheduleByDate[dateKey].items.sort((a, b) => a.time.localeCompare(b.time));
             }
 
+            const getMemberBadge = (memberId) => {
+                if (memberId === 'self' || memberFilter !== 'all') return '';
+                const member = familyMembers.find(m => m.id === memberId);
+                return member ? ` <span style="background: #e3f2fd; color: #667eea; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${member.name}</span>` : '';
+            };
+
             // 渲染
             let html = '';
             Object.keys(scheduleByDate).forEach(dateKey => {
                 const day = scheduleByDate[dateKey];
                 if (day.items.length === 0) return;
-
-                const memberName = (memberId) => {
-                    if (memberId === 'self') return '';
-                    const member = familyMembers.find(m => m.id === memberId);
-                    return member ? ` (${member.name})` : '';
-                };
 
                 html += `
                     <div style="margin-bottom: 30px;">
@@ -1488,7 +1589,7 @@
                                 <div class="med-item">
                                     <div class="med-icon">💊</div>
                                     <div class="med-info">
-                                        <div class="med-name">${item.name}${memberName(item.member)}</div>
+                                        <div class="med-name">${item.name}${getMemberBadge(item.member)}</div>
                                         <div class="med-dosage">${item.dosage}</div>
                                     </div>
                                     <div class="med-time">
@@ -1514,6 +1615,7 @@
         async function loadHistory() {
             const container = document.getElementById('historyList');
             const filter = document.getElementById('historyFilter').value;
+            const memberFilter = document.getElementById('historyMemberFilter')?.value || 'all';
             
             try {
                 // 計算日期範圍
@@ -1578,19 +1680,32 @@
                     // 找到對應的藥物
                     const medicine = medicines.find(m => m.id === record.medicineId);
                     if (medicine) {
-                        recordsByDate[dateKey].records.push({
-                            ...record,
-                            medicineName: medicine.name,
-                            dosage: medicine.dosage
-                        });
+                        // 成員篩選
+                        if (memberFilter === 'all' || medicine.member === memberFilter) {
+                            recordsByDate[dateKey].records.push({
+                                ...record,
+                                medicineName: medicine.name,
+                                dosage: medicine.dosage,
+                                member: medicine.member
+                            });
+                        }
                     }
                 });
 
+                const getMemberBadge = (memberId) => {
+                    if (memberId === 'self' || memberFilter !== 'all') return '';
+                    const member = familyMembers.find(m => m.id === memberId);
+                    return member ? ` <span style="background: #e3f2fd; color: #667eea; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${member.name}</span>` : '';
+                };
+
                 // 渲染
                 let html = '';
+                let hasRecords = false;
                 Object.keys(recordsByDate).sort().reverse().forEach(dateKey => {
                     const day = recordsByDate[dateKey];
+                    if (day.records.length === 0) return;
                     
+                    hasRecords = true;
                     html += `
                         <div style="margin-bottom: 30px;">
                             <h4 style="color: #666; margin-bottom: 15px; font-size: 16px;">
@@ -1601,7 +1716,7 @@
                                     <div class="med-item">
                                         <div class="med-icon" style="background: #4caf50;">✓</div>
                                         <div class="med-info">
-                                            <div class="med-name">${record.medicineName}</div>
+                                            <div class="med-name">${record.medicineName}${getMemberBadge(record.member)}</div>
                                             <div class="med-dosage">${record.dosage} • 計劃時間: ${record.time}</div>
                                         </div>
                                         <div class="med-time">
@@ -1615,7 +1730,16 @@
                     `;
                 });
 
-                container.innerHTML = html;
+                if (!hasRecords) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📋</div>
+                            <p>此期間無服藥記錄</p>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = html;
+                }
             } catch (error) {
                 console.error('載入歷史記錄錯誤:', error);
                 container.innerHTML = `
