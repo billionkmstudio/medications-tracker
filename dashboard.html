@@ -582,7 +582,7 @@
                             <select id="homeFilter" onchange="filterTodaySchedule()" 
                                     style="padding: 6px 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
                                 <option value="all">全部成員</option>
-                                <option value="self">本人</option>
+                                <option value="self" selected>本人</option>
                             </select>
                             <a href="#" style="color: #667eea; text-decoration: none; font-size: 14px;" onclick="showPage('schedule')">查看全部 →</a>
                         </div>
@@ -1043,6 +1043,9 @@
                         <p>${filterName ? filterName + ' ' : ''}今日無用藥排程</p>
                     </div>
                 `;
+                
+                // 更新統計（空的情況）
+                updateStats();
                 return;
             }
 
@@ -1071,6 +1074,9 @@
                     </button>
                 </div>
             `).join('');
+            
+            // 更新統計
+            updateStats();
         }
 
         // 渲染藥物列表
@@ -1124,8 +1130,16 @@
 
         // 更新統計
         function updateStats() {
-            const total = todaySchedule.length;
-            const taken = todaySchedule.filter(s => s.taken).length;
+            const filter = document.getElementById('homeFilter')?.value || 'all';
+            
+            // 篩選排程
+            let filteredSchedule = todaySchedule;
+            if (filter !== 'all') {
+                filteredSchedule = todaySchedule.filter(item => item.member === filter);
+            }
+            
+            const total = filteredSchedule.length;
+            const taken = filteredSchedule.filter(s => s.taken).length;
             const pending = total - taken;
             const percentage = total > 0 ? Math.round((taken / total) * 100) : 0;
 
@@ -1182,8 +1196,7 @@
                 showToast('已取消記錄', 'success');
             }
 
-            renderTodaySchedule();
-            updateStats();
+            filterTodaySchedule(); // 這會同時更新顯示和統計
         }
 
         // 新增藥物
