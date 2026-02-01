@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的用藥日記 | MyMedLog</title>
+    <style>
+        /* ===== 基礎樣式 ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo .icon {
+            font-size: 60px;
+            margin-bottom: 10px;
+        }
+
+        .logo h1 {
+            color: #667eea;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        /* 標籤切換 */
+        .tabs {
+            display: flex;
+            margin-bottom: 25px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #667eea;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: white;
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: #f0f0ff;
+        }
+
+        /* 表單 */
+        .form {
+            display: none;
+        }
+
+        .form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: #aaa;
+        }
+
+        /* 按鈕 */
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 連結 */
+        .link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .link a:hover {
+            text-decoration: underline;
+        }
+
+        /* 分隔線 */
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 25px 0;
+            color: #999;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e0e0e0;
+        }
+
+        .divider span {
+            padding: 0 15px;
+            font-size: 14px;
+        }
+
+        /* 社交登入 */
+        .social-btns {
+            display: flex;
+            gap: 12px;
+        }
+
+        .social-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: white;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .social-btn:hover {
+            background: #f5f5f5;
+            border-color: #ccc;
+        }
+
+        /* Toast 通知 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+
+        .toast {
+            padding: 15px 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.2);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s ease;
+            min-width: 280px;
+        }
+
+        .toast.success { border-left: 4px solid #4caf50; }
+        .toast.error { border-left: 4px solid #f44336; }
+        .toast.warning { border-left: 4px solid #ff9800; }
+        .toast.info { border-left: 4px solid #2196f3; }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* 載入動畫 */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            justify-content: center;
+            align-items: center;
+            z-index: 9998;
+        }
+
+        .loading.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e0e0e0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 錯誤訊息 */
+        .error-msg {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            border-left: 4px solid #f44336;
+        }
+
+        .error-msg.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- 載入動畫 -->
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- Logo -->
+        <div class="logo">
+            <div class="icon">💊</div>
+            <h1>MediTrack</h1>
+            <p style="color: #999; font-size: 14px; margin-top: 5px;">用藥記錄管理系統</p>
+        </div>
+
+        <!-- 標籤切換 -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('login')">登入</button>
+            <button class="tab-btn" onclick="switchTab('register')">註冊</button>
+        </div>
+
+        <!-- 錯誤訊息 -->
+        <div id="errorMsg" class="error-msg"></div>
+
+        <!-- 登入表單 -->
+        <form id="loginForm" class="form active" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="loginEmail">電子郵件</label>
+                <input type="email" id="loginEmail" placeholder="your@email.com" required>
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">密碼</label>
+                <input type="password" id="loginPassword" placeholder="請輸入密碼" required>
+            </div>
+            <button type="submit" id="loginBtn" class="btn btn-primary">登入</button>
+            <div class="link">
+                <a onclick="resetPassword()">忘記密碼？</a>
+            </div>
+        </form>
+
+        <!-- 註冊表單 -->
+        <form id="registerForm" class="form" onsubmit="handleRegister(event)">
+            <div class="form-group">
+                <label for="registerName">姓名</label>
+                <input type="text" id="registerName" placeholder="請輸入姓名" required>
+            </div>
+            <div class="form-group">
+                <label for="registerEmail">電子郵件</label>
+                <input type="email" id="registerEmail" placeholder="your@email.com" required>
+            </div>
+            <div class="form-group">
+                <label for="registerPassword">密碼</label>
+                <input type="password" id="registerPassword" placeholder="至少6個字元" required>
+            </div>
+            <div class="form-group">
+                <label for="registerConfirm">確認密碼</label>
+                <input type="password" id="registerConfirm" placeholder="再次輸入密碼" required>
+            </div>
+            <button type="submit" id="registerBtn" class="btn btn-primary">註冊</button>
+        </form>
+
+        <!-- 社交登入 -->
+        <div class="divider">
+            <span>或使用以下方式</span>
+        </div>
+        <div class="social-btns">
+            <button class="social-btn" onclick="googleLogin()" title="Google 登入">🔍</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+    <script>
+        // Firebase 配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyC1Z05_-nWU8ctk266zTZ3qL_9Wo0a9Ps8",
+            authDomain: "medication-tracker-a8b7d.firebaseapp.com",
+            projectId: "medication-tracker-a8b7d",
+            storageBucket: "medication-tracker-a8b7d.firebasestorage.app",
+            messagingSenderId: "926334827314",
+            appId: "1:926334827314:web:5fc38ee464eb1dd965b52b",
+            measurementId: "G-753S8BWFDD"
+        };
+
+        // 初始化 Firebase
+        let app, auth, db;
+        
+        try {
+            app = firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            db = firebase.firestore();
+            console.log('✅ Firebase 初始化成功');
+        } catch (error) {
+            console.error('❌ Firebase 初始化失敗:', error);
+            showToast('系統初始化失敗', 'error');
+        }
+
+        // ===== 工具函數 =====
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+            toast.innerHTML = `<span>${icons[type]}</span><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function showLoading() {
+            document.getElementById('loading').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('active');
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMsg');
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('errorMsg').classList.remove('show');
+        }
+
+        // 取得基礎路徑
+        function getBasePath() {
+            const path = window.location.pathname;
+            return path.substring(0, path.lastIndexOf('/') + 1);
+        }
+
+        // ===== 頁面邏輯 =====
+        
+        // 檢查登入狀態
+        auth.onAuthStateChanged((user) => {
+            hideLoading();
+            if (user) {
+                console.log('✅ 已登入:', user.email);
+                window.location.href = getBasePath() + 'dashboard.html';
+            }
+        });
+
+        // 切換標籤
+        function switchTab(tab) {
+            const tabs = document.querySelectorAll('.tab-btn');
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            
+            hideError();
+            tabs.forEach(t => t.classList.remove('active'));
+            
+            if (tab === 'login') {
+                tabs[0].classList.add('active');
+                loginForm.classList.add('active');
+                registerForm.classList.remove('active');
+            } else {
+                tabs[1].classList.add('active');
+                loginForm.classList.remove('active');
+                registerForm.classList.add('active');
+            }
+        }
+
+        // 登入
+        async function handleLogin(event) {
+            event.preventDefault();
+            hideError();
+            
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const btn = document.getElementById('loginBtn');
+            
+            if (!email || !password) {
+                showError('請填寫所有欄位');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = '登入中...';
+            showLoading();
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                showToast('登入成功！', 'success');
+                // onAuthStateChanged 會處理跳轉
+            } catch (error) {
+                hideLoading();
+                btn.disabled = false;
+                btn.textContent = '登入';
+                
+                let message = '登入失敗';
+                switch (error.code) {
+                    case 'auth/user-not-found':
+                        message = '找不到此帳號，請先註冊';
+                        break;
+                    case 'auth/wrong-password':
+                        message = '密碼錯誤';
+                        break;
+                    case 'auth/invalid-email':
+                        message = '電子郵件格式錯誤';
+                        break;
+                    case 'auth/too-many-requests':
+                        message = '嘗試次數過多，請稍後再試';
+                        break;
+                    case 'auth/invalid-credential':
+                        message = '帳號或密碼錯誤';
+                        break;
+                    case 'auth/network-request-failed':
+                        message = '網路連線失敗';
+                        break;
+                    default:
+                        message = error.message;
+                }
+                showError(message);
+                showToast(message, 'error');
+                console.error('登入錯誤:', error);
+            }
+        }
+
+        // 註冊
+        async function handleRegister(event) {
+            event.preventDefault();
+            hideError();
+            
+            const name = document.getElementById('registerName').value.trim();
+            const email = document.getElementById('registerEmail').value.trim();
+            const password = document.getElementById('registerPassword').value;
+            const confirm = document.getElementById('registerConfirm').value;
+            const btn = document.getElementById('registerBtn');
+            
+            // 驗證
+            if (!name || !email || !password || !confirm) {
+                showError('請填寫所有欄位');
+                return;
+            }
+            
+            if (password !== confirm) {
+                showError('兩次輸入的密碼不一致');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showError('密碼至少需要6個字元');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = '註冊中...';
+            showLoading();
+            
+            try {
+                // 建立帳號
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                
+                // 更新使用者名稱
+                await userCredential.user.updateProfile({
+                    displayName: name
+                });
+                
+                // 儲存到 Firestore
+                await db.collection('users').doc(userCredential.user.uid).set({
+                    name: name,
+                    email: email,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showToast('註冊成功！', 'success');
+                // onAuthStateChanged 會處理跳轉
+                
+            } catch (error) {
+                hideLoading();
+                btn.disabled = false;
+                btn.textContent = '註冊';
+                
+                let message = '註冊失敗';
+                switch (error.code) {
+                    case 'auth/email-already-in-use':
+                        message = '此電子郵件已被使用';
+                        break;
+                    case 'auth/invalid-email':
+                        message = '電子郵件格式錯誤';
+                        break;
+                    case 'auth/weak-password':
+                        message = '密碼強度不足，請使用更複雜的密碼';
+                        break;
+                    case 'auth/network-request-failed':
+                        message = '網路連線失敗';
+                        break;
+                    default:
+                        message = error.message;
+                }
+                showError(message);
+                showToast(message, 'error');
+                console.error('註冊錯誤:', error);
+            }
+        }
+
+        // Google 登入
+        async function googleLogin() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            
+            showLoading();
+            
+            try {
+                const result = await auth.signInWithPopup(provider);
+                
+                // 如果是新使用者，儲存資料
+                if (result.additionalUserInfo?.isNewUser) {
+                    await db.collection('users').doc(result.user.uid).set({
+                        name: result.user.displayName,
+                        email: result.user.email,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                
+                showToast('登入成功！', 'success');
+                
+            } catch (error) {
+                hideLoading();
+                
+                if (error.code !== 'auth/popup-closed-by-user') {
+                    showToast('Google 登入失敗', 'error');
+                    console.error('Google 登入錯誤:', error);
+                }
+            }
+        }
+
+        // 忘記密碼
+        async function resetPassword() {
+            const email = document.getElementById('loginEmail').value.trim();
+            
+            if (!email) {
+                showError('請先輸入電子郵件');
+                showToast('請先輸入電子郵件', 'warning');
+                return;
+            }
+            
+            try {
+                await auth.sendPasswordResetEmail(email);
+                showToast('重設密碼郵件已發送，請檢查信箱', 'success');
+            } catch (error) {
+                showToast('發送失敗：' + error.message, 'error');
+            }
+        }
+
+        console.log('📋 頁面載入完成');
+    </script>
+</body>
+</html>
