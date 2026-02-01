@@ -1149,10 +1149,13 @@
             const container = document.getElementById('medicinesList');
             const filter = document.getElementById('medicinesFilter')?.value || 'all';
             
-            // 篩選藥物
+            // 篩選藥物（修復：正確處理 member 欄位）
             let filteredMedicines = medicines;
             if (filter !== 'all') {
-                filteredMedicines = medicines.filter(med => med.member === filter);
+                filteredMedicines = medicines.filter(med => {
+                    const medMember = med.member || med.memberId || 'self';
+                    return medMember === filter;
+                });
             }
             
             if (filteredMedicines.length === 0) {
@@ -1170,8 +1173,9 @@
 
             container.innerHTML = filteredMedicines.map(med => {
                 const times = Array.isArray(med.times) ? med.times.join('、') : med.time;
-                const memberName = med.member === 'self' ? '' : 
-                    (familyMembers.find(m => m.id === med.member)?.name || '');
+                const medMember = med.member || med.memberId || 'self';
+                const memberName = medMember === 'self' ? '' : 
+                    (familyMembers.find(m => m.id === medMember)?.name || '');
                 
                 const memberBadge = memberName ? 
                     ` <span style="background: #e3f2fd; color: #667eea; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${memberName}</span>` : '';
@@ -1197,10 +1201,13 @@
         function updateStats() {
             const filter = document.getElementById('homeFilter')?.value || 'all';
             
-            // 篩選排程
+            // 篩選排程（修復：正確處理 member 欄位）
             let filteredSchedule = todaySchedule;
             if (filter !== 'all') {
-                filteredSchedule = todaySchedule.filter(item => item.member === filter);
+                filteredSchedule = todaySchedule.filter(item => {
+                    const itemMember = item.member || item.memberId || 'self';
+                    return itemMember === filter;
+                });
             }
             
             const total = filteredSchedule.length;
@@ -1581,10 +1588,13 @@
             const filter = document.getElementById('scheduleFilter').value;
             const memberFilter = document.getElementById('scheduleMemberFilter')?.value || 'all';
             
-            // 篩選藥物
+            // 篩選藥物（修復：正確處理 member 欄位）
             let filteredMedicines = medicines;
             if (memberFilter !== 'all') {
-                filteredMedicines = medicines.filter(med => med.member === memberFilter);
+                filteredMedicines = medicines.filter(med => {
+                    const medMember = med.member || med.memberId || 'self';
+                    return medMember === memberFilter;
+                });
             }
             
             if (filteredMedicines.length === 0) {
@@ -1759,13 +1769,14 @@
                     // 找到對應的藥物
                     const medicine = medicines.find(m => m.id === record.medicineId);
                     if (medicine) {
-                        // 成員篩選
-                        if (memberFilter === 'all' || medicine.member === memberFilter) {
+                        // 成員篩選（修復：正確處理 member 欄位）
+                        const medMember = medicine.member || medicine.memberId || 'self';
+                        if (memberFilter === 'all' || medMember === memberFilter) {
                             recordsByDate[dateKey].records.push({
                                 ...record,
                                 medicineName: medicine.name,
                                 dosage: medicine.dosage,
-                                member: medicine.member
+                                member: medMember
                             });
                         }
                     }
@@ -1936,14 +1947,29 @@
                 
                 medicines.forEach(med => {
                     if (med.frequency === 'asNeeded') return;
-                    if (memberFilter !== 'all' && med.member !== memberFilter) return;
+                    if (memberFilter !== 'all' && (med.member || 'self') !== memberFilter) return;
 
-                    // 計算開始和結束日期
-                    const medStart = med.startDate ? new Date(med.startDate) : startDate;
-                    const medEnd = med.endDate ? new Date(med.endDate) : today;
+                    // 關鍵修復：使用藥物的創建日期或開始日期作為起點
+                    let medStartDate = null;
                     
-                    const checkStart = medStart > startDate ? medStart : startDate;
-                    const checkEnd = medEnd < today ? medEnd : today;
+                    if (med.startDate) {
+                        medStartDate = new Date(med.startDate);
+                    } else if (med.createdAt) {
+                        // 如果有 createdAt（Firestore timestamp），使用它
+                        medStartDate = med.createdAt.toDate ? med.createdAt.toDate() : new Date(med.createdAt);
+                    } else {
+                        // 如果都沒有，跳過這個藥物（不應該計算錯過）
+                        return;
+                    }
+                    
+                    const medEndDate = med.endDate ? new Date(med.endDate) : today;
+                    
+                    // 確保檢查範圍不早於藥物開始日期
+                    const checkStart = medStartDate > startDate ? medStartDate : startDate;
+                    const checkEnd = medEndDate < today ? medEndDate : today;
+                    
+                    // 如果開始日期晚於結束日期，跳過
+                    if (checkStart > checkEnd) return;
 
                     // 檢查每一天
                     for (let d = new Date(checkStart); d <= checkEnd; d.setDate(d.getDate() + 1)) {
@@ -1967,16 +1993,28 @@
                 // 計算統計
                 const totalMissed = missedRecords.length;
                 
-                // 計算總計劃劑量
+                // 計算總計劃劑量（使用相同的邏輯）
                 let totalPlanned = 0;
                 medicines.forEach(med => {
                     if (med.frequency === 'asNeeded') return;
-                    if (memberFilter !== 'all' && med.member !== memberFilter) return;
+                    if (memberFilter !== 'all' && (med.member || 'self') !== memberFilter) return;
 
-                    const medStart = med.startDate ? new Date(med.startDate) : startDate;
-                    const medEnd = med.endDate ? new Date(med.endDate) : today;
-                    const checkStart = medStart > startDate ? medStart : startDate;
-                    const checkEnd = medEnd < today ? medEnd : today;
+                    // 使用與上面相同的邏輯
+                    let medStartDate = null;
+                    
+                    if (med.startDate) {
+                        medStartDate = new Date(med.startDate);
+                    } else if (med.createdAt) {
+                        medStartDate = med.createdAt.toDate ? med.createdAt.toDate() : new Date(med.createdAt);
+                    } else {
+                        return;
+                    }
+                    
+                    const medEndDate = med.endDate ? new Date(med.endDate) : today;
+                    const checkStart = medStartDate > startDate ? medStartDate : startDate;
+                    const checkEnd = medEndDate < today ? medEndDate : today;
+                    
+                    if (checkStart > checkEnd) return;
                     
                     const days = Math.floor((checkEnd - checkStart) / (1000 * 60 * 60 * 24)) + 1;
                     if (days > 0) totalPlanned += days;
