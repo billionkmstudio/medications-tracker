@@ -654,8 +654,8 @@
                     <div style="display: flex; gap: 10px;">
                         <select id="scheduleMemberFilter" onchange="renderSchedule()" 
                                 style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
-                            <option value="all">全部成員</option>
                             <option value="self">本人</option>
+                            <option value="all">全家人</option>
                         </select>
                         <select id="scheduleFilter" onchange="renderSchedule()" 
                                 style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
@@ -677,8 +677,8 @@
                     <div style="display: flex; gap: 10px;">
                         <select id="historyMemberFilter" onchange="loadHistory()" 
                                 style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
-                            <option value="all">全部成員</option>
                             <option value="self">本人</option>
+                            <option value="all">全家人</option>
                         </select>
                         <select id="historyFilter" onchange="loadHistory()" 
                                 style="padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
@@ -729,8 +729,8 @@
                         <option value="all">全部</option>
                     </select>
                     <select id="missedMemberFilter" onchange="loadMissedReport()" style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
-                        <option value="all">所有成員</option>
-                        <option value="self">自己</option>
+                        <option value="self">本人</option>
+                        <option value="all">全家人</option>
                     </select>
                 </div>
 
@@ -1037,7 +1037,8 @@
 
         // 生成今日排程
         function generateTodaySchedule() {
-            const today = new Date().toDateString();
+            // 修復：使用 ISO 日期格式以保持一致性
+            const today = new Date().toISOString().split('T')[0];
             todaySchedule = [];
 
             medicines.forEach(med => {
@@ -1242,7 +1243,8 @@
             const item = todaySchedule[index];
             item.taken = !item.taken;
 
-            const today = new Date().toDateString();
+            // 修復：使用 ISO 日期格式以保持一致性
+            const today = new Date().toISOString().split('T')[0];
             
             if (item.taken) {
                 // 記錄服藥
@@ -1929,47 +1931,44 @@
                     startDate.setDate(startDate.getDate() - parseInt(filter));
                 }
 
-                // 獲取所有服藥記錄
+                // 獲取所有服藥記錄，包含實際服藥時間
                 const recordsSnapshot = await db.collection('records')
                     .where('userId', '==', currentUser.uid)
                     .get();
 
                 const takenRecords = {};
+                const takenTimes = {}; // 記錄實際服藥時間
                 recordsSnapshot.forEach(doc => {
                     const record = doc.data();
-                    // 修復：包含時間在 key 中，以支援一天多次服藥
                     const key = `${record.date}_${record.medicineId}_${record.time}`;
                     takenRecords[key] = true;
+                    takenTimes[key] = record.takenAt || record.timestamp; // 實際服藥時間
                 });
 
-                // 計算應該服用的藥物
-                const missedRecords = [];
+                // 計算應該服用的藥物，並區分 "準時/遲食" 和 "未食"
+                const lateRecords = []; // 遲了食的記錄
+                const notTakenRecords = []; // 仍未食的記錄
                 const today = new Date();
                 
                 medicines.forEach(med => {
                     if (med.frequency === 'asNeeded') return;
                     if (memberFilter !== 'all' && (med.member || 'self') !== memberFilter) return;
 
-                    // 關鍵修復：使用藥物的創建日期或開始日期作為起點
+                    // 使用藥物的創建日期或開始日期作為起點
                     let medStartDate = null;
                     
                     if (med.startDate) {
                         medStartDate = new Date(med.startDate);
                     } else if (med.createdAt) {
-                        // 如果有 createdAt（Firestore timestamp），使用它
                         medStartDate = med.createdAt.toDate ? med.createdAt.toDate() : new Date(med.createdAt);
                     } else {
-                        // 如果都沒有，跳過這個藥物（不應該計算錯過）
                         return;
                     }
                     
                     const medEndDate = med.endDate ? new Date(med.endDate) : today;
-                    
-                    // 確保檢查範圍不早於藥物開始日期
                     const checkStart = medStartDate > startDate ? medStartDate : startDate;
                     const checkEnd = medEndDate < today ? medEndDate : today;
                     
-                    // 如果開始日期晚於結束日期，跳過
                     if (checkStart > checkEnd) return;
 
                     // 處理每日多次服藥的情況
@@ -1983,9 +1982,35 @@
                         times.forEach(time => {
                             const key = `${dateStr}_${med.id}_${time}`;
                             
-                            // 如果這個時間點應該服用但沒有記錄，就是錯過了
-                            if (!takenRecords[key]) {
-                                missedRecords.push({
+                            if (takenRecords[key]) {
+                                // 已服用，檢查是否遲了
+                                const scheduledDateTime = new Date(`${dateStr}T${time}`);
+                                const takenDateTime = takenTimes[key] ? 
+                                    (takenTimes[key].toDate ? takenTimes[key].toDate() : new Date(takenTimes[key])) 
+                                    : null;
+                                
+                                if (takenDateTime) {
+                                    const delayMinutes = (takenDateTime - scheduledDateTime) / (1000 * 60);
+                                    const status = delayMinutes > 30 ? '遲了食' : '準時食';
+                                    
+                                    // 只記錄遲了食的
+                                    if (delayMinutes > 30) {
+                                        lateRecords.push({
+                                            date: dateStr,
+                                            medicineId: med.id,
+                                            medicineName: med.name,
+                                            dosage: med.dosage,
+                                            scheduledTime: time,
+                                            actualTime: takenDateTime.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
+                                            delayMinutes: Math.round(delayMinutes),
+                                            status: status,
+                                            member: med.member
+                                        });
+                                    }
+                                }
+                            } else {
+                                // 未服用
+                                notTakenRecords.push({
                                     date: dateStr,
                                     medicineId: med.id,
                                     medicineName: med.name,
@@ -1999,17 +2024,16 @@
                 });
 
                 // 計算統計
-                const totalMissed = missedRecords.length;
+                const totalMissed = notTakenRecords.length;
+                const totalLate = lateRecords.length;
                 
-                // 計算總計劃劑量（使用相同的邏輯，並考慮一天多次服藥）
+                // 計算總計劃劑量
                 let totalPlanned = 0;
                 medicines.forEach(med => {
                     if (med.frequency === 'asNeeded') return;
                     if (memberFilter !== 'all' && (med.member || 'self') !== memberFilter) return;
 
-                    // 使用與上面相同的邏輯
                     let medStartDate = null;
-                    
                     if (med.startDate) {
                         medStartDate = new Date(med.startDate);
                     } else if (med.createdAt) {
@@ -2025,8 +2049,6 @@
                     if (checkStart > checkEnd) return;
                     
                     const days = Math.floor((checkEnd - checkStart) / (1000 * 60 * 60 * 24)) + 1;
-                    
-                    // 修復：考慮一天多次服藥
                     const times = Array.isArray(med.times) ? med.times : [med.time];
                     const timesPerDay = times.length;
                     
@@ -2039,7 +2061,7 @@
 
                 // 找出最常錯過的藥物
                 const medCounts = {};
-                missedRecords.forEach(record => {
+                notTakenRecords.forEach(record => {
                     medCounts[record.medicineId] = (medCounts[record.medicineId] || 0) + 1;
                 });
                 
@@ -2055,24 +2077,30 @@
                 document.getElementById('complianceRate').textContent = complianceRate + '%';
                 document.getElementById('mostMissedMed').textContent = mostMissedMed;
 
-                // 渲染列表
-                if (missedRecords.length === 0) {
+                // 渲染列表 - 分成兩欄
+                if (lateRecords.length === 0 && notTakenRecords.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
                             <div class="icon">🎉</div>
-                            <p>太棒了！此期間沒有錯過任何藥物</p>
+                            <p>太棒了！此期間沒有錯過或遲食任何藥物</p>
                         </div>
                     `;
                     return;
                 }
 
-                // 按日期分組
-                const recordsByDate = {};
-                missedRecords.forEach(record => {
+                const getMemberBadge = (memberId) => {
+                    if (memberId === 'self' || memberFilter !== 'all') return '';
+                    const member = familyMembers.find(m => m.id === memberId);
+                    return member ? ` <span style="background: #e3f2fd; color: #667eea; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${member.name}</span>` : '';
+                };
+
+                // 按日期分組 - 遲食記錄
+                const lateByDate = {};
+                lateRecords.forEach(record => {
                     const dateKey = record.date;
-                    if (!recordsByDate[dateKey]) {
+                    if (!lateByDate[dateKey]) {
                         const date = new Date(dateKey);
-                        recordsByDate[dateKey] = {
+                        lateByDate[dateKey] = {
                             display: date.toLocaleDateString('zh-TW', {
                                 year: 'numeric',
                                 month: 'long',
@@ -2082,42 +2110,114 @@
                             records: []
                         };
                     }
-                    recordsByDate[dateKey].records.push(record);
+                    lateByDate[dateKey].records.push(record);
                 });
 
-                const getMemberBadge = (memberId) => {
-                    if (memberId === 'self' || memberFilter !== 'all') return '';
-                    const member = familyMembers.find(m => m.id === memberId);
-                    return member ? ` <span style="background: #e3f2fd; color: #667eea; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${member.name}</span>` : '';
-                };
+                // 按日期分組 - 未食記錄
+                const notTakenByDate = {};
+                notTakenRecords.forEach(record => {
+                    const dateKey = record.date;
+                    if (!notTakenByDate[dateKey]) {
+                        const date = new Date(dateKey);
+                        notTakenByDate[dateKey] = {
+                            display: date.toLocaleDateString('zh-TW', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric',
+                                weekday: 'short'
+                            }),
+                            records: []
+                        };
+                    }
+                    notTakenByDate[dateKey].records.push(record);
+                });
 
-                // 渲染
-                let html = '';
-                Object.keys(recordsByDate).sort().reverse().forEach(dateKey => {
-                    const day = recordsByDate[dateKey];
+                // 渲染兩欄佈局
+                let html = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">';
+                
+                // 左欄：已食但遲了
+                html += '<div>';
+                html += '<h4 style="color: #666; margin-bottom: 15px; font-size: 18px; display: flex; align-items: center; gap: 8px;"><span style="font-size: 24px;">⏰</span> 已服用（遲了）</h4>';
+                
+                if (lateRecords.length === 0) {
                     html += `
-                        <div style="margin-bottom: 30px;">
-                            <h4 style="color: #666; margin-bottom: 15px; font-size: 16px;">
-                                ${day.display}
-                            </h4>
-                            <div class="med-list">
-                                ${day.records.map(record => `
-                                    <div class="med-item" style="border-color: #ffcdd2; background: #ffebee;">
-                                        <div class="med-icon" style="background: #f44336;">⚠️</div>
-                                        <div class="med-info">
-                                            <div class="med-name">${record.medicineName}${getMemberBadge(record.member)}</div>
-                                            <div class="med-dosage">${record.dosage} • 計劃時間: ${record.time}</div>
-                                        </div>
-                                        <div class="med-time">
-                                            <div class="time">${record.time}</div>
-                                            <div class="time-label" style="color: #f44336;">已錯過</div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
+                        <div class="empty-state" style="background: #e8f5e9; border: 2px dashed #4caf50;">
+                            <div class="icon">✅</div>
+                            <p style="color: #2e7d32;">沒有遲食記錄</p>
                         </div>
                     `;
-                });
+                } else {
+                    Object.keys(lateByDate).sort().reverse().forEach(dateKey => {
+                        const day = lateByDate[dateKey];
+                        html += `
+                            <div style="margin-bottom: 20px;">
+                                <h5 style="color: #888; margin-bottom: 10px; font-size: 14px;">
+                                    ${day.display}
+                                </h5>
+                                <div class="med-list">
+                                    ${day.records.map(record => `
+                                        <div class="med-item" style="border-color: #ffe0b2; background: #fff3e0;">
+                                            <div class="med-icon" style="background: #ff9800;">⏰</div>
+                                            <div class="med-info">
+                                                <div class="med-name">${record.medicineName}${getMemberBadge(record.member)}</div>
+                                                <div class="med-dosage">${record.dosage}</div>
+                                                <div class="med-dosage" style="color: #f57c00;">計劃: ${record.scheduledTime} → 實際: ${record.actualTime} (遲了 ${record.delayMinutes} 分鐘)</div>
+                                            </div>
+                                            <div class="med-time">
+                                                <div class="time">${record.actualTime}</div>
+                                                <div class="time-label" style="color: #ff9800;">遲了食</div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+                
+                html += '</div>';
+                
+                // 右欄：仍未食
+                html += '<div>';
+                html += '<h4 style="color: #666; margin-bottom: 15px; font-size: 18px; display: flex; align-items: center; gap: 8px;"><span style="font-size: 24px;">⚠️</span> 仍未服用</h4>';
+                
+                if (notTakenRecords.length === 0) {
+                    html += `
+                        <div class="empty-state" style="background: #e8f5e9; border: 2px dashed #4caf50;">
+                            <div class="icon">✅</div>
+                            <p style="color: #2e7d32;">全部已服用</p>
+                        </div>
+                    `;
+                } else {
+                    Object.keys(notTakenByDate).sort().reverse().forEach(dateKey => {
+                        const day = notTakenByDate[dateKey];
+                        html += `
+                            <div style="margin-bottom: 20px;">
+                                <h5 style="color: #888; margin-bottom: 10px; font-size: 14px;">
+                                    ${day.display}
+                                </h5>
+                                <div class="med-list">
+                                    ${day.records.map(record => `
+                                        <div class="med-item" style="border-color: #ffcdd2; background: #ffebee;">
+                                            <div class="med-icon" style="background: #f44336;">⚠️</div>
+                                            <div class="med-info">
+                                                <div class="med-name">${record.medicineName}${getMemberBadge(record.member)}</div>
+                                                <div class="med-dosage">${record.dosage} • 計劃時間: ${record.time}</div>
+                                            </div>
+                                            <div class="med-time">
+                                                <div class="time">${record.time}</div>
+                                                <div class="time-label" style="color: #f44336;">未服用</div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+                
+                html += '</div>';
+                html += '</div>';
 
                 container.innerHTML = html;
 
