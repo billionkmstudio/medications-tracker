@@ -1797,6 +1797,13 @@
                     const day = recordsByDate[dateKey];
                     if (day.records.length === 0) return;
                     
+                    // 將每天內的記錄按時間倒序排列（最新的在最上面）
+                    day.records.sort((a, b) => {
+                        const timeA = a.actualTime || a.time;
+                        const timeB = b.actualTime || b.time;
+                        return timeB.localeCompare(timeA);
+                    });
+                    
                     hasRecords = true;
                     html += `
                         <div style="margin-bottom: 30px;">
@@ -1931,23 +1938,26 @@
                     startDate.setDate(startDate.getDate() - parseInt(filter));
                 }
 
-                // 獲取所有服藥記錄，包含實際服藥時間
+                // 獲取所有服藥記錄，包含實際服藥時間和時間戳
                 const recordsSnapshot = await db.collection('records')
                     .where('userId', '==', currentUser.uid)
                     .get();
 
                 const takenRecords = {};
-                const takenTimes = {}; // 記錄實際服藥時間
+                const takenDetails = {}; // 儲存詳細的服藥資料
                 recordsSnapshot.forEach(doc => {
                     const record = doc.data();
                     const key = `${record.date}_${record.medicineId}_${record.time}`;
                     takenRecords[key] = true;
-                    takenTimes[key] = record.takenAt || record.timestamp; // 實際服藥時間
+                    takenDetails[key] = {
+                        actualTime: record.actualTime || record.time,
+                        takenAt: record.takenAt || record.timestamp || record.createdAt
+                    };
                 });
 
-                // 計算應該服用的藥物，並區分 "準時/遲食" 和 "未食"
-                const lateRecords = []; // 遲了食的記錄
-                const notTakenRecords = []; // 仍未食的記錄
+                // 計算應該服用的藥物，並區分 "遲食" 和 "未食"
+                const lateRecords = []; // 已食但遲了的記錄
+                const notTakenRecords = []; // 完全未食的記錄
                 const today = new Date();
                 
                 medicines.forEach(med => {
@@ -1985,15 +1995,17 @@
                             if (takenRecords[key]) {
                                 // 已服用，檢查是否遲了
                                 const scheduledDateTime = new Date(`${dateStr}T${time}`);
-                                const takenDateTime = takenTimes[key] ? 
-                                    (takenTimes[key].toDate ? takenTimes[key].toDate() : new Date(takenTimes[key])) 
-                                    : null;
+                                const detail = takenDetails[key];
+                                
+                                let takenDateTime = null;
+                                if (detail.takenAt) {
+                                    takenDateTime = detail.takenAt.toDate ? detail.takenAt.toDate() : new Date(detail.takenAt);
+                                }
                                 
                                 if (takenDateTime) {
                                     const delayMinutes = (takenDateTime - scheduledDateTime) / (1000 * 60);
-                                    const status = delayMinutes > 30 ? '遲了食' : '準時食';
                                     
-                                    // 只記錄遲了食的
+                                    // 如果遲了超過30分鐘，記錄為遲食
                                     if (delayMinutes > 30) {
                                         lateRecords.push({
                                             date: dateStr,
@@ -2001,15 +2013,14 @@
                                             medicineName: med.name,
                                             dosage: med.dosage,
                                             scheduledTime: time,
-                                            actualTime: takenDateTime.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
+                                            actualTime: detail.actualTime,
                                             delayMinutes: Math.round(delayMinutes),
-                                            status: status,
                                             member: med.member
                                         });
                                     }
                                 }
                             } else {
-                                // 未服用
+                                // 完全未服用
                                 notTakenRecords.push({
                                     date: dateStr,
                                     medicineId: med.id,
@@ -2023,9 +2034,8 @@
                     }
                 });
 
-                // 計算統計
+                // 計算統計（只計算完全未食的）
                 const totalMissed = notTakenRecords.length;
-                const totalLate = lateRecords.length;
                 
                 // 計算總計劃劑量
                 let totalPlanned = 0;
@@ -2133,7 +2143,7 @@
                 });
 
                 // 渲染兩欄佈局
-                let html = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">';
+                let html = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">';
                 
                 // 左欄：已食但遲了
                 html += '<div>';
@@ -2141,9 +2151,9 @@
                 
                 if (lateRecords.length === 0) {
                     html += `
-                        <div class="empty-state" style="background: #e8f5e9; border: 2px dashed #4caf50;">
-                            <div class="icon">✅</div>
-                            <p style="color: #2e7d32;">沒有遲食記錄</p>
+                        <div style="background: #e8f5e9; border: 2px solid #4caf50; border-radius: 12px; padding: 30px; text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+                            <p style="color: #2e7d32; font-weight: 500;">沒有遲食記錄</p>
                         </div>
                     `;
                 } else {
@@ -2156,12 +2166,13 @@
                                 </h5>
                                 <div class="med-list">
                                     ${day.records.map(record => `
-                                        <div class="med-item" style="border-color: #ffe0b2; background: #fff3e0;">
+                                        <div class="med-item" style="border-color: #ffe0b2; background: #fff8e1;">
                                             <div class="med-icon" style="background: #ff9800;">⏰</div>
                                             <div class="med-info">
                                                 <div class="med-name">${record.medicineName}${getMemberBadge(record.member)}</div>
                                                 <div class="med-dosage">${record.dosage}</div>
-                                                <div class="med-dosage" style="color: #f57c00;">計劃: ${record.scheduledTime} → 實際: ${record.actualTime} (遲了 ${record.delayMinutes} 分鐘)</div>
+                                                <div class="med-dosage" style="color: #f57c00; font-size: 12px;">計劃: ${record.scheduledTime} → 實際: ${record.actualTime}</div>
+                                                <div class="med-dosage" style="color: #f57c00; font-weight: 500; font-size: 12px;">遲了 ${record.delayMinutes} 分鐘</div>
                                             </div>
                                             <div class="med-time">
                                                 <div class="time">${record.actualTime}</div>
@@ -2183,9 +2194,9 @@
                 
                 if (notTakenRecords.length === 0) {
                     html += `
-                        <div class="empty-state" style="background: #e8f5e9; border: 2px dashed #4caf50;">
-                            <div class="icon">✅</div>
-                            <p style="color: #2e7d32;">全部已服用</p>
+                        <div style="background: #e8f5e9; border: 2px solid #4caf50; border-radius: 12px; padding: 30px; text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+                            <p style="color: #2e7d32; font-weight: 500;">全部已服用</p>
                         </div>
                     `;
                 } else {
